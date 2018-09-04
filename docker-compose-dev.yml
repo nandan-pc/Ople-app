@@ -1,0 +1,29 @@
+version: '3.6'
+
+services:
+
+  experiments:
+    build:
+      context: ./services/experiments
+      dockerfile: Dockerfile-dev
+    volumes:
+      - './services/experiments:/usr/src/app'
+    ports:
+      - 5001:5000
+    environment:
+      - FLASK_ENV=development
+      - APP_SETTINGS=project.config.DevelopmentConfig
+      - DATABASE_URL=postgres://postgres:postgres@experiments-db:5432/opledb_dev
+      - DATABASE_TEST_URL=postgres://postgres:postgres@experiments-db:5432/opledb_test
+    depends_on:
+      - experiments-db
+
+  experiments-db:
+    build:
+      context: ./services/experiments/project/db
+      dockerfile: Dockerfile
+    ports:
+      - 5435:5432
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
