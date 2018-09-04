@@ -1,11 +1,12 @@
+from typing import Text
 import pathlib
 
 class Locator:
 
-    def __init__ (self, id, train_data, test_data):
+    def __init__ (self, id: int, train_data_filename: Text, test_data_filename: Text):
 
-        self.train_data = train_data
-        self.test_data = test_data
+        self.train_data_filename = train_data_filename
+        self.test_data_filename = test_data_filename
 
         self.train_data_dir = f'/experiments/{id}/data/train'
         self.test_data_dir = f'/experiments/{id}/data/test'
