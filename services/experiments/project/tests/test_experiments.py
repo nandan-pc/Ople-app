@@ -14,6 +14,8 @@ from project.api.experiments import Experiment
 
 def add_experiment(name: Text, type: Text, train_data_filename: Text, test_data_filename: Text, train_data, test_data):
     experiment = Experiment(name=name, type=type)
+    db.session.add(experiment)
+    db.session.commit()
 
     experiment_locator = Locator(experiment.id,
                                  train_data_filename=train_data_filename,
@@ -30,10 +32,35 @@ def add_experiment(name: Text, type: Text, train_data_filename: Text, test_data_
     experiment.train_data = train_data_filename
     experiment.test_data = test_data_filename
 
-    db.session.add(experiment)
     db.session.commit()
     return experiment
 
+def get_lr_test_experiment():
+    train_data = open(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'data', 'train.csv'), 'rb')
+    test_data = open(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'data', 'test.csv'), 'rb')
+
+    lr_test_experiment = add_experiment(name="LR_test",
+                                   type="classification",
+                                   train_data_filename='lr_train.csv',
+                                   train_data=train_data,
+                                   test_data_filename='lr_test.csv',
+                                   test_data=test_data, )
+
+    return lr_test_experiment
+
+
+def get_svm_test_experiment():
+    train_data = open(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'data', 'train.csv'), 'rb')
+    test_data = open(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'data', 'test.csv'), 'rb')
+
+    svm_test_experiment = add_experiment(name="svm_test",
+                                        type="classification",
+                                        train_data_filename='svm_train.csv',
+                                        train_data=train_data,
+                                        test_data_filename='svm_test.csv',
+                                        test_data=test_data, )
+
+    return svm_test_experiment
 
 class TestUserService(BaseTestCase):
     """Tests for the Experiments Service"""
@@ -350,66 +377,84 @@ class TestUserService(BaseTestCase):
             self.assertIn('Experiment id 2 Not Found!', data['message'])
             self.assertIn('fail', data['status'])
 
-    # def test_train_experiment(self):
-    #     """Ensure training an experiment behaves properly"""
-    #     experiment = add_experiment(name="Logistic Regression", type="classification", train_data="pima_indians:80",
-    #                                 test_data="pima_indians:20")
-    #     with self.client:
-    #         response = self.client.post(f'/experiments/train/{experiment.id}')
-    #         data = json.loads(response.data.decode())
-    #
-    #         self.assertEqual(response.status_code, 200)
-    #         self.assertIn('Experiment id 1 Trained!', data['message'])
-    #         self.assertIn('success', data['status'])
-    #
-    #
-    # def test_test_experiment(self):
-    #     """Ensure test an experiment behaves properly"""
-    #     experiment = add_experiment(name="Logistic Regression", type="classification", train_data="pima_indians:80",
-    #                                 test_data="pima_indians:20")
-    #     with self.client:
-    #         response = self.client.post(f'/experiments/train/{experiment.id}')
-    #         data = json.loads(response.data.decode())
-    #
-    #         self.assertEqual(response.status_code, 200)
-    #         self.assertIn('Experiment id 1 Trained!', data['message'])
-    #         self.assertIn('success', data['status'])
-    #
-    #         response = self.client.post(f'/experiments/test/{experiment.id}')
-    #         data = json.loads(response.data.decode())
-    #
-    #         self.assertEqual(response.status_code, 200)
-    #         self.assertIn('Experiment id 1 Tested!', data['message'])
-    #         self.assertIn('success', data['status'])
-    #
-    #
-    # def test_predict_experiment(self):
-    #     """Ensure predict a data sample behaves properly"""
-    #     experiment = add_experiment(name="Logistic Regression", type="classification", train_data="pima_indians:80",
-    #                                 test_data="pima_indians:20")
-    #     with self.client:
-    #         response = self.client.post(f'/experiments/train/{experiment.id}')
-    #         data = json.loads(response.data.decode())
-    #
-    #         self.assertEqual(response.status_code, 200)
-    #         self.assertIn('Experiment id 1 Trained!', data['message'])
-    #         self.assertIn('success', data['status'])
-    #
-    #         response = self.client.post(
-    #             f'/experiments/predict/{experiment.id}',
-    #             data=json.dumps({
-    #                 "sample": {'name': 1,
-    #                            'age': 2,
-    #                            'gender': 'M'}
-    #             }),
-    #             content_type='application/json'
-    #         )
-    #
-    #         data = json.loads(response.data.decode())
-    #
-    #         self.assertEqual(response.status_code, 200)
-    #         self.assertIn('Experiment id 1, Data Sample Predicted!', data['message'])
-    #         self.assertIn('success', data['status'])
+    def test_train_experiment(self):
+        """Ensure training an experiment behaves properly"""
+        lr_experiment = get_lr_test_experiment()
+        with self.client:
+            response = self.client.post(f'/experiments/train/{lr_experiment.id}')
+            data = json.loads(response.data.decode())
+            train_result = json.loads(data['result'])
+            train_accuracy = train_result[0]['train_accuracy']
+            self.assertEqual(round(train_accuracy, 3), 0.667)
+            self.assertEqual(response.status_code, 200)
+            self.assertIn('Experiment id 1 Trained!', data['message'])
+            self.assertIn('success', data['status'])
+
+    def test_train_experiment_invalid_id(self):
+        """Ensure training an experiment behaves properly"""
+        lr_experiment = get_lr_test_experiment()
+        with self.client:
+            response = self.client.post(f'/experiments/train/{2}')
+            data = json.loads(response.data.decode())
+
+            self.assertEqual(response.status_code, 404)
+            self.assertIn('Experiment id 2 Not Found!', data['message'])
+            self.assertIn('fail', data['status'])
+
+    def test_test_experiment(self):
+        """Ensure test an experiment behaves properly"""
+        lr_experiment = get_lr_test_experiment()
+        with self.client:
+            response = self.client.post(f'/experiments/train/{lr_experiment.id}')
+            data = json.loads(response.data.decode())
+            result = json.loads(data['result'])
+            train_accuracy = result[0]['train_accuracy']
+            self.assertEqual(round(train_accuracy, 3), 0.667)
+            self.assertEqual(response.status_code, 200)
+            self.assertIn('Experiment id 1 Trained!', data['message'])
+            self.assertIn('success', data['status'])
+
+            response = self.client.post(f'/experiments/test/{lr_experiment.id}')
+            data = json.loads(response.data.decode())
+            result = json.loads(data['result'])
+            test_accuracy = result[1]['test_accuracy']
+            self.assertEqual(response.status_code, 200)
+            self.assertIn('Experiment id 1 Tested!', data['message'])
+            self.assertIn('success', data['status'])
+
+    def test_predict_experiment(self):
+        """Ensure predict a data sample behaves properly"""
+        lr_experiment = get_lr_test_experiment()
+        with self.client:
+            response = self.client.post(f'/experiments/train/{lr_experiment.id}')
+            data = json.loads(response.data.decode())
+            result = json.loads(data['result'])
+            train_accuracy = result[0]['train_accuracy']
+            self.assertEqual(round(train_accuracy, 3), 0.667)
+            self.assertEqual(response.status_code, 200)
+            self.assertIn('Experiment id 1 Trained!', data['message'])
+            self.assertIn('success', data['status'])
+
+            # response = self.client.post(f'/experiments/predict/{lr_experiment.id}',
+            #                             content_type='application/json',
+            #                             json = {'sample': 'sample'})
+            payload = {'sample': (1, 2, 3)}
+            response = self.client.post(
+                f'/experiments/predict/{lr_experiment.id}',
+                content_type='application/json',
+                data = json.dumps(payload)
+                # content_type='multipart/form-data',
+                # data = {
+                #     'sample': ['1', '2', '3']
+                # }
+            )
+            data = json.loads(response.data.decode())
+            # prediction = data['prediction']
+
+            self.assertEqual(response.status_code, 200)
+            # self.assertEqual(prediction, 0)
+            self.assertIn('Experiment id 1, Data Sample Predicted!', data['message'])
+            self.assertIn('success', data['status'])
 
 
 if __name__ == '__main__':
