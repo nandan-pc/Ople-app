@@ -1,37 +1,48 @@
 from abc import ABC, abstractmethod
+from project.ml.data_loader import DataLoader
+from sklearn.linear_model import LogisticRegression
+from sklearn import metrics
 
 class Model(ABC):
 
     @abstractmethod
-    def __init__(self, hyperparams, train_data, test_data):
+    def __init__(self, hyperparams):
         pass
 
     @abstractmethod
-    def train(self):
+    def train(self, X, y):
         pass
 
     @abstractmethod
-    def test(self):
+    def test(self, X, y):
         pass
 
     @abstractmethod
-    def predict(self, sample):
+    def predict(self, X):
         pass
 
 
 class Logistic_Regression(Model):
-
-    def __init__(self, hyperparams, train_data, test_data):
+    """Linear Model"""
+    def __init__(self, hyperparams):
         self.hyperparams = hyperparams
-        self.train_data = train_data
-        self.test_data = test_data
 
-    def train(self):
-        pass
+    def train(self, X, y):
+        self.clf = LogisticRegression()
+        self.clf.fit(X, y)
+        y_hat = self.clf.predict(X)
+        accuracy = metrics.accuracy_score(y, y_hat)
+        result = {'train_accuracy': accuracy}
+        return result
 
-    def test(self):
-        pass
+    def test(self, X, y):
+        y_hat = self.clf.predict(X)
+        accuracy = metrics.accuracy_score(y, y_hat)
+        result = {'test_accuracy': accuracy}
+        return result
 
-    def predict(self, sample):
-        pass
+    def predict(self, X):
+        y_hat = self.clf.predict(X)
+        return y_hat
+
 

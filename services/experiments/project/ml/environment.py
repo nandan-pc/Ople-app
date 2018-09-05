@@ -1,5 +1,7 @@
+import os
 from typing import Text
 import pathlib
+import shutil
 
 class Locator:
 
@@ -7,6 +9,7 @@ class Locator:
 
         self.train_data_filename = train_data_filename
         self.test_data_filename = test_data_filename
+        self.model_filename = 'model.pkl'
 
         self.train_data_dir = f'/experiments/{id}/data/train'
         self.test_data_dir = f'/experiments/{id}/data/test'
@@ -23,6 +26,19 @@ class Locator:
                     self.train_result_dir,
                     self.test_result_dir]:
             pathlib.Path(dir).mkdir(parents=True, exist_ok=True)
+
+    @classmethod
+    def delete_experiment_folders(cls, id):
+        shutil.rmtree(f'/experiments/{id}')
+
+    def get_train_data_file_path(self):
+        return os.path.join(self.get_train_data_dir(), self.train_data_filename)
+
+    def get_test_data_file_path(self):
+        return os.path.join(self.get_test_data_dir(), self.test_data_filename)
+
+    def get_model_file_path(self):
+        return os.path.join(self.get_model_dir(), self.model_filename)
 
     def get_train_data_dir(self):
         return self.train_data_dir

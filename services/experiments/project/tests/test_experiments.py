@@ -53,7 +53,7 @@ def get_svm_test_experiment():
     train_data = open(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'data', 'train.csv'), 'rb')
     test_data = open(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'data', 'test.csv'), 'rb')
 
-    svm_test_experiment = add_experiment(name="svm_test",
+    svm_test_experiment = add_experiment(name="SVM_test",
                                         type="classification",
                                         train_data_filename='svm_train.csv',
                                         train_data=train_data,
@@ -61,6 +61,11 @@ def get_svm_test_experiment():
                                         test_data=test_data, )
 
     return svm_test_experiment
+
+
+def clean_up_folders(ids):
+    _ = [Locator.delete_experiment_folders(i) for i in ids]
+
 
 class TestUserService(BaseTestCase):
     """Tests for the Experiments Service"""
@@ -94,8 +99,11 @@ class TestUserService(BaseTestCase):
 
             data = json.loads(response.data.decode())
             self.assertEqual(response.status_code, 201)
+            self.assertEqual(1, data['id'])
             self.assertIn('Experiment LR_Test added!', data['message'])
             self.assertIn('success', data['status'])
+
+            clean_up_folders(ids=[data['id']])
 
     def test_add_experiment_invalid_empty_form(self):
         """Ensure error is thrown if empty form is submitted"""
@@ -179,40 +187,48 @@ class TestUserService(BaseTestCase):
             self.assertIn('Experiment LR_Test Invalid! \n Invalid file extention test.png', data['message'])
             self.assertIn('fail', data['status'])
 
+    def test_add_experiment_duplicate_name(self):
+        """Ensure error is thrown if duplicate experiment name is given """
+        lr_experiment = get_lr_test_experiment()
+        date = datetime.utcnow()
+        train_file = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'data', 'train.csv')
+        test_file = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'data', 'test.csv')
+        with self.client:
+            response = self.client.post(
+                '/experiments',
+                content_type='multipart/form-data',
+                data={
+                    'name': lr_experiment.name,
+                    'type': 'classification',
+                    'start_date': str(date),
+                    'train_data': (open(train_file, 'rb'), os.path.basename(train_file)),
+                    'test_data': (open(test_file, 'rb'), os.path.basename(test_file))
+                })
+
+            data = json.loads(response.data.decode())
+            self.assertEqual(response.status_code, 409)
+            self.assertIn('Experiment with name: LR_test exists, Please enter unique experiment name', data['message'])
+            self.assertIn('fail', data['status'])
+        clean_up_folders([lr_experiment.id])
+
     def test_get_single_experiment(self):
         """Ensure get single experiement behaves properly"""
-        train_data = open(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'data', 'train.csv'), 'rb')
-        test_data = open(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'data', 'test.csv'), 'rb')
-
-        experiment = add_experiment(name="Logistic Regression",
-                                    type="classification",
-                                    train_data_filename='train.csv',
-                                    train_data=train_data,
-                                    test_data_filename='test.csv',
-                                    test_data=test_data, )
+        lr_experiment = get_lr_test_experiment()
 
         with self.client:
-            response = self.client.get(f'/experiments/{experiment.id}')
+            response = self.client.get(f'/experiments/{lr_experiment.id}')
             data = json.loads(response.data.decode())
             self.assertEqual(response.status_code, 200)
-            self.assertIn('Logistic Regression', data['data']['name'])
+            self.assertIn('LR_test', data['data']['name'])
             self.assertIn('classification', data['data']['type'])
             self.assertIn('train.csv', data['data']['train_data'])
             self.assertIn('test.csv', data['data']['test_data'])
             self.assertIn('success', data['status'])
 
+        clean_up_folders([lr_experiment.id])
+
     def test_get_single_query_invalid_experiment(self):
         """Ensure get single experiement behaves properly"""
-        train_data = open(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'data', 'train.csv'), 'rb')
-        test_data = open(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'data', 'test.csv'), 'rb')
-
-        experiment = add_experiment(name="Logistic Regression",
-                                    type="classification",
-                                    train_data_filename='train.csv',
-                                    train_data=train_data,
-                                    test_data_filename='test.csv',
-                                    test_data=test_data, )
-
         with self.client:
             response = self.client.get(f'/experiments/{1000}')
             data = json.loads(response.data.decode())
@@ -222,38 +238,24 @@ class TestUserService(BaseTestCase):
 
     def test_get_all_experiments(self):
         """Ensure get all experiment details behaves properly"""
-        train_data = open(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'data', 'train.csv'), 'rb')
-        test_data = open(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'data', 'test.csv'), 'rb')
-
-        _ = add_experiment(name="Logistic Regression",
-                           type="classification",
-                           train_data_filename='lr_train.csv',
-                           train_data=train_data,
-                           test_data_filename='lr_test.csv',
-                           test_data=test_data, )
-
-        _ = add_experiment( name="SVM",
-                            type="classification",
-                            train_data_filename='svm_train.csv',
-                            train_data=train_data,
-                            test_data_filename='svm_test.csv',
-                            test_data=test_data, )
-
+        lr_experiment = get_lr_test_experiment()
+        svm_experiment = get_svm_test_experiment()
         with self.client:
             response = self.client.get('/experiments')
             data = json.loads(response.data.decode())
 
             self.assertEqual(response.status_code, 200)
             self.assertEqual(len(data['data']['experiments']), 2)
-            self.assertIn('Logistic Regression', data['data']['experiments'][0]['name'])
+            self.assertIn('LR_test', data['data']['experiments'][0]['name'])
             self.assertIn('classification', data['data']['experiments'][0]['type'])
             self.assertIn('lr_train.csv', data['data']['experiments'][0]['train_data'])
             self.assertIn('lr_test.csv', data['data']['experiments'][0]['test_data'])
-            self.assertIn('SVM', data['data']['experiments'][1]['name'])
+            self.assertIn('SVM_test', data['data']['experiments'][1]['name'])
             self.assertIn('classification', data['data']['experiments'][1]['type'])
             self.assertIn('svm_train.csv', data['data']['experiments'][1]['train_data'])
             self.assertIn('svm_test.csv', data['data']['experiments'][1]['test_data'])
             self.assertIn('success', data['status'])
+        clean_up_folders([lr_experiment.id, svm_experiment.id])
 
     def test_get_all_experiments_from_empty_table(self):
         with self.client:
@@ -267,15 +269,7 @@ class TestUserService(BaseTestCase):
     def test_update_single_experiment(self):
         """Ensure Update single experiment details behaves propoerly """
 
-        train_data = open(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'data', 'train.csv'), 'rb')
-        test_data = open(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'data', 'test.csv'), 'rb')
-
-        experiment = add_experiment(name="LR_test_v1",
-                                    type="classification",
-                                    train_data_filename='lr_train.csv',
-                                    train_data=train_data,
-                                    test_data_filename='lr_test.csv',
-                                    test_data=test_data, )
+        lr_experiment = get_lr_test_experiment()
 
         date = datetime.utcnow()
         train_file = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'data', 'train_v2.csv')
@@ -283,7 +277,7 @@ class TestUserService(BaseTestCase):
 
         with self.client:
             response = self.client.put(
-                f'/experiments/{experiment.id}',
+                f'/experiments/{lr_experiment.id}',
                 content_type='multipart/form-data',
                 data={
                     'name': 'LR_test_v2',
@@ -301,7 +295,7 @@ class TestUserService(BaseTestCase):
             self.assertIn('Experiment id 1 Updated!', data['message'])
             self.assertIn('success', data['status'])
 
-            response = self.client.get(f'/experiments/{experiment.id}')
+            response = self.client.get(f'/experiments/{lr_experiment.id}')
             data = json.loads(response.data.decode())
             self.assertEqual(response.status_code, 200)
             self.assertIn('LR_test_v2', data['data']['name'])
@@ -310,18 +304,11 @@ class TestUserService(BaseTestCase):
             self.assertIn('train_v2.csv', data['data']['train_data'])
             self.assertIn('test_v2.csv', data['data']['test_data'])
             self.assertIn('success', data['status'])
+        clean_up_folders([lr_experiment.id])
 
     def test_update_single_experiment_invalid_id(self):
 
-        train_data = open(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'data', 'train.csv'), 'rb')
-        test_data = open(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'data', 'test.csv'), 'rb')
-
-        experiment = add_experiment(name="LR_test_v1",
-                                    type="classification",
-                                    train_data_filename='lr_train.csv',
-                                    train_data=train_data,
-                                    test_data_filename='lr_test.csv',
-                                    test_data=test_data, )
+        lr_experiment = get_lr_test_experiment()
 
         date = datetime.utcnow()
         train_file = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'data', 'train_v2.csv')
@@ -346,19 +333,11 @@ class TestUserService(BaseTestCase):
             self.assertEqual(response.status_code, 404)
             self.assertIn('Experiment id 2 Not Found!', data['message'])
             self.assertIn('fail', data['status'])
+        clean_up_folders([lr_experiment.id])
 
     def test_delete_single_experiment_invalid_id(self):
         """Ensure delete single experiment behaves properly """
-        train_data = open(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'data', 'train.csv'), 'rb')
-        test_data = open(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'data', 'test.csv'), 'rb')
-
-        lr_experiment = add_experiment(name="Logistic Regression",
-                                       type="classification",
-                                       train_data_filename='lr_train.csv',
-                                       train_data=train_data,
-                                       test_data_filename='lr_test.csv',
-                                       test_data=test_data, )
-
+        lr_experiment = get_lr_test_experiment()
 
         with self.client:
             response = self.client.get('/experiments')
@@ -376,6 +355,7 @@ class TestUserService(BaseTestCase):
             self.assertEqual(response.status_code, 404)
             self.assertIn('Experiment id 2 Not Found!', data['message'])
             self.assertIn('fail', data['status'])
+        clean_up_folders([lr_experiment.id])
 
     def test_train_experiment(self):
         """Ensure training an experiment behaves properly"""
@@ -385,10 +365,11 @@ class TestUserService(BaseTestCase):
             data = json.loads(response.data.decode())
             train_result = json.loads(data['result'])
             train_accuracy = train_result[0]['train_accuracy']
-            self.assertEqual(round(train_accuracy, 3), 0.667)
+            self.assertEqual(round(train_accuracy, 3), 1.0)
             self.assertEqual(response.status_code, 200)
             self.assertIn('Experiment id 1 Trained!', data['message'])
             self.assertIn('success', data['status'])
+        clean_up_folders([lr_experiment.id])
 
     def test_train_experiment_invalid_id(self):
         """Ensure training an experiment behaves properly"""
@@ -400,6 +381,7 @@ class TestUserService(BaseTestCase):
             self.assertEqual(response.status_code, 404)
             self.assertIn('Experiment id 2 Not Found!', data['message'])
             self.assertIn('fail', data['status'])
+        clean_up_folders([lr_experiment.id])
 
     def test_test_experiment(self):
         """Ensure test an experiment behaves properly"""
@@ -409,18 +391,30 @@ class TestUserService(BaseTestCase):
             data = json.loads(response.data.decode())
             result = json.loads(data['result'])
             train_accuracy = result[0]['train_accuracy']
-            self.assertEqual(round(train_accuracy, 3), 0.667)
+            self.assertEqual(round(train_accuracy, 3), 1.0)
             self.assertEqual(response.status_code, 200)
             self.assertIn('Experiment id 1 Trained!', data['message'])
             self.assertIn('success', data['status'])
-
             response = self.client.post(f'/experiments/test/{lr_experiment.id}')
             data = json.loads(response.data.decode())
             result = json.loads(data['result'])
             test_accuracy = result[1]['test_accuracy']
+            self.assertEqual(round(test_accuracy, 3), 1.0)
             self.assertEqual(response.status_code, 200)
             self.assertIn('Experiment id 1 Tested!', data['message'])
             self.assertIn('success', data['status'])
+        clean_up_folders([lr_experiment.id])
+
+    def test_test_experiment_before_training(self):
+        """Ensure test an experiment behaves properly"""
+        lr_experiment = get_lr_test_experiment()
+        with self.client:
+            response = self.client.post(f'/experiments/test/{lr_experiment.id}')
+            data = json.loads(response.data.decode())
+            self.assertEqual(response.status_code, 404)
+            self.assertIn('Experiment id 1 Not Trained! Model Not found', data['message'])
+            self.assertIn('fail', data['status'])
+        clean_up_folders([lr_experiment.id])
 
     def test_predict_experiment(self):
         """Ensure predict a data sample behaves properly"""
@@ -430,32 +424,85 @@ class TestUserService(BaseTestCase):
             data = json.loads(response.data.decode())
             result = json.loads(data['result'])
             train_accuracy = result[0]['train_accuracy']
-            self.assertEqual(round(train_accuracy, 3), 0.667)
+            self.assertEqual(round(train_accuracy, 3), 1.0)
             self.assertEqual(response.status_code, 200)
             self.assertIn('Experiment id 1 Trained!', data['message'])
             self.assertIn('success', data['status'])
 
-            # response = self.client.post(f'/experiments/predict/{lr_experiment.id}',
-            #                             content_type='application/json',
-            #                             json = {'sample': 'sample'})
-            payload = {'sample': (1, 2, 3)}
+            payload = {'sample': {
+                                    'pregnancies': 0,
+                                    'glucose': 137,
+                                    'blood_pressure': 40,
+                                    'skin_thickness': 35,
+                                    'insulin': 168,
+                                    'bmi': 43.1,
+                                    'diabetes_pedigree_function': 2.88,
+                                    'age': 33
+                                    }
+                                }
             response = self.client.post(
                 f'/experiments/predict/{lr_experiment.id}',
                 content_type='application/json',
                 data = json.dumps(payload)
-                # content_type='multipart/form-data',
-                # data = {
-                #     'sample': ['1', '2', '3']
-                # }
             )
             data = json.loads(response.data.decode())
-            # prediction = data['prediction']
+            prediction = data['prediction']
 
             self.assertEqual(response.status_code, 200)
-            # self.assertEqual(prediction, 0)
+            self.assertEqual(prediction[0], 1)
             self.assertIn('Experiment id 1, Data Sample Predicted!', data['message'])
             self.assertIn('success', data['status'])
+        clean_up_folders([lr_experiment.id])
 
+    def test_predict_experiment_invalid_id(self):
+        """Ensure predict a data sample behaves properly"""
+        lr_experiment = get_lr_test_experiment()
+        with self.client:
+            response = self.client.post(f'/experiments/train/{lr_experiment.id}')
+            data = json.loads(response.data.decode())
+            result = json.loads(data['result'])
+            train_accuracy = result[0]['train_accuracy']
+            self.assertEqual(round(train_accuracy, 3), 1.0)
+            self.assertEqual(response.status_code, 200)
+            self.assertIn('Experiment id 1 Trained!', data['message'])
+            self.assertIn('success', data['status'])
+            payload = {'sample': (1, 2, 3)}
+            response = self.client.post(
+                f'/experiments/predict/{2}',
+                content_type='application/json',
+                data = json.dumps(payload)
+            )
+            data = json.loads(response.data.decode())
+            self.assertEqual(response.status_code, 404)
+            self.assertIn('Experiment id 2 Not Found!', data['message'])
+            self.assertIn('fail', data['status'])
+        clean_up_folders([lr_experiment.id])
+
+    def test_predict_experiment_before_training(self):
+        """Ensure predict a data sample behaves properly"""
+        lr_experiment = get_lr_test_experiment()
+        with self.client:
+            payload = {'sample': {
+                                    'pregnancies': 0,
+                                    'glucose': 137,
+                                    'blood_pressure': 40,
+                                    'skin_thickness': 35,
+                                    'insulin': 168,
+                                    'bmi': 43.1,
+                                    'diabetes_pedigree_function': 2.88,
+                                    'age': 33
+                                    }
+                                }
+            response = self.client.post(
+                f'/experiments/predict/{lr_experiment.id}',
+                content_type='application/json',
+                data = json.dumps(payload)
+            )
+            data = json.loads(response.data.decode())
+            self.assertEqual(response.status_code, 404)
+            self.assertIn('Experiment id 1 Not Trained! Model Not found', data['message'])
+            self.assertIn('fail', data['status'])
+        clean_up_folders([lr_experiment.id])
 
 if __name__ == '__main__':
     unittest.main()

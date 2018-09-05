@@ -1,13 +1,62 @@
+import json
+import os
+from project.ml.data_loader import DataLoader
+from project.ml.environment import Locator
+from project.ml.models import Logistic_Regression
+from project.ml.dataset_maker import LRPimaIndiansDatasetMaker
 
 class ConductExperiment:
-    def train(experiment_id):
-        # get experiment name
-        pass
+    @classmethod
+    def train(cls, experiment):
+        name = experiment.name
+        exp_locator = Locator(experiment.id, experiment.train_data, experiment.test_data)
+        if 'LR_' in name:
+            lr_dataset_maker = LRPimaIndiansDatasetMaker(exp_locator)
+            X, y  = lr_dataset_maker.make_train_dataset()
+            hyperparams = {'learning_rate': 0.01}
+            logistic_regression = Logistic_Regression(hyperparams=hyperparams)
+            result = logistic_regression.train(X, y)
+            DataLoader.save(file_object=logistic_regression,
+                            file_path=os.path.join(exp_locator.get_model_dir(), 'model.pkl'))
+            experiment.result = json.dumps([result])
+            return experiment
 
-    def test(expreriment_id):
-        # get experiment name
-        pass
+        raise Exception("No valid Experiment Name to train Experiment")
 
-    def predict(experiment_id, sample):
-        # get experiment name
-        pass
+    @classmethod
+    def test(cls, experiment):
+        name = experiment.name
+        exp_locator = Locator(experiment.id, experiment.train_data, experiment.test_data)
+
+        if 'LR_' in name:
+            lr_dataset_maker = LRPimaIndiansDatasetMaker(exp_locator)
+            X, y = lr_dataset_maker.make_train_dataset()
+
+            logistic_regression = DataLoader.load(exp_locator.get_model_file_path())
+            test_result = logistic_regression.test(X, y)
+            exp_result = json.loads(experiment.result)
+            exp_result.append(test_result)
+            experiment.result = json.dumps(exp_result)
+            return experiment
+
+        raise Exception("No valid Experiment Name to train Experiment")
+
+    @classmethod
+    def predict(cls, experiment, sample):
+        name = experiment.name
+        exp_locator = Locator(experiment.id, experiment.train_data, experiment.test_data)
+        if 'LR_' in name:
+            lr_dataset_maker = LRPimaIndiansDatasetMaker(exp_locator)
+            X = lr_dataset_maker.make_one_sample(sample)
+            logistic_regression = DataLoader.load(exp_locator.get_model_file_path())
+            prediction = logistic_regression.predict(X)
+            prediction = prediction.tolist()
+            return prediction
+
+    @classmethod
+    def is_experiment_trained(cls, experiment):
+        exp_locator = Locator(experiment.id, experiment.train_data, experiment.test_data)
+        if os.path.exists(exp_locator.get_model_file_path()):
+            return True
+        else:
+            return False
