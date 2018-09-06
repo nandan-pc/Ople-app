@@ -77,7 +77,7 @@ def add_experiment():
         train_data_filename = secure_filename(train_data_file.filename)
 
         test_data_file = request.files['test_data']
-        test_data_filename = secure_filename(train_data_file.filename)
+        test_data_filename = secure_filename(test_data_file.filename)
 
         experiment = Experiment(name=name, type=type)
         db.session.add(experiment)
@@ -308,6 +308,7 @@ def test(id):
             return jsonify(response_object), 404
 
         experiment = ConductExperiment.test(experiment=experiment)
+        db.session.commit()
 
         response_object = {
             'status': 'success',
