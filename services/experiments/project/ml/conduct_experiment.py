@@ -13,7 +13,7 @@ class ConductExperiment:
         if 'LR_' in name:
             lr_dataset_maker = LRPimaIndiansDatasetMaker(exp_locator)
             X, y  = lr_dataset_maker.make_train_dataset()
-            hyperparams = {'learning_rate': 0.01}
+            hyperparams = {'penalty': 'l2'}
             logistic_regression = Logistic_Regression(hyperparams=hyperparams)
             result = logistic_regression.train(X, y)
             DataLoader.save(file_object=logistic_regression,
@@ -30,8 +30,7 @@ class ConductExperiment:
 
         if 'LR_' in name:
             lr_dataset_maker = LRPimaIndiansDatasetMaker(exp_locator)
-            X, y = lr_dataset_maker.make_train_dataset()
-
+            X, y = lr_dataset_maker.make_test_dataset()
             logistic_regression = DataLoader.load(exp_locator.get_model_file_path())
             test_result = logistic_regression.test(X, y)
             exp_result = json.loads(experiment.result)
