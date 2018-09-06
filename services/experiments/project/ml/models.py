@@ -28,7 +28,7 @@ class Logistic_Regression(Model):
         self.hyperparams = hyperparams
 
     def train(self, X, y):
-        self.clf = LogisticRegression()
+        self.clf = LogisticRegression(penalty=self.hyperparams['penalty'])
         self.clf.fit(X, y)
         y_hat = self.clf.predict(X)
         accuracy = metrics.accuracy_score(y, y_hat)
