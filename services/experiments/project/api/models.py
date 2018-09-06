@@ -11,7 +11,7 @@ class Experiment(db.Model):
     start_date = db.Column(db.DateTime, nullable=False)
     # start_date = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     type = db.Column(db.String(128), nullable=False)
-    result = db.Column(db.String(4096))
+    result = db.Column(db.JSON)
     test_data = db.Column(db.String(255))
     train_data = db.Column(db.String(255))
 
